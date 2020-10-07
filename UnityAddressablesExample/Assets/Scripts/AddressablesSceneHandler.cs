@@ -149,6 +149,7 @@ public class AddressablesSceneHandler : MonoBehaviour
 
     void GUIBundleCaches()
     {
+        int clearCounter = 0;
         GUILayout.BeginVertical("box");
         {
             GUILayout.BeginHorizontal("box");
@@ -167,19 +168,26 @@ public class AddressablesSceneHandler : MonoBehaviour
                 }
                 if (GUILayout.Button("Clear Old Bundle Caches", GUILayout.Height(40)))
                 {
-                    // @TODO implementation
+                    foreach (var bc in BundleCaches.Instance.Bundles)
+                    {
+                        if (!BundleManager.Instance.HasBundleWithHash(bc.name, bc.hash))
+                        {
+                            Debug.Log($"Removing {bc.name} : {bc.hash}");
+                            Caching.ClearCachedVersion(bc.name, Hash128.Parse(bc.hash));
+                            clearCounter++;
+                        }
+                    }
                 }
             }
             GUILayout.EndHorizontal();
 
-            bool clearSomething = false;
             foreach (var bundleCache in BundleCaches.Instance.Bundles)
             {
                 GUILayout.BeginHorizontal("box");
                 {
                     if (GUILayout.Button("X", GUILayout.Width(40), GUILayout.Height(40)))
                     {
-                        clearSomething = true;
+                        clearCounter++;
                         Caching.ClearCachedVersion(bundleCache.name, Hash128.Parse(bundleCache.hash));
                     }
                     GUILayout.Button($"{bundleCache.name.Substring(0, 6)}");
@@ -188,12 +196,14 @@ public class AddressablesSceneHandler : MonoBehaviour
                 }
                 GUILayout.EndVertical();
             }
-            if (clearSomething)
-            {
-                cacheSize = Caches.GetAllCachedSize();
-                BundleManager.Instance.RefreshBundles();
-            }
         }
         GUILayout.EndVertical();
+
+        if (clearCounter > 0)
+        {
+            cacheSize = Caches.GetAllCachedSize();
+            BundleManager.Instance.RefreshBundles();
+        }
+
     }
 }

@@ -107,4 +107,9 @@ public class BundleManager
     {
         return bundles.Where(b => b.size > 0).Select(b => b.key);
     }
+
+    public bool HasBundleWithHash(string bundleName, string bundleHash)
+    {
+        return bundles.Exists(b => b.bundleName == bundleName && b.bundleHash == bundleHash);
+    }
 }
