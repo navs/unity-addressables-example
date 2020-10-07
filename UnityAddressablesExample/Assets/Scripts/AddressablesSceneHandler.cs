@@ -16,6 +16,8 @@ public class AddressablesSceneHandler : MonoBehaviour
     RawImage mainImage;
     RenderTexture rt;
 
+    List<string> bundleNames;
+
     string Log
     {
         set
@@ -51,6 +53,22 @@ public class AddressablesSceneHandler : MonoBehaviour
             Addressables.InitializeAsync().Completed += (handler) =>
             {
                 Log = $"Initialized ... Result : {handler.Status}";
+
+                bundleNames = new List<string>();
+                foreach (var locator in Addressables.ResourceLocators)
+                {
+                    Log = $"Locator: {locator.LocatorId}";
+                    foreach (var key in locator.Keys)
+                    {
+                        if (key.ToString().EndsWith("bundle"))
+                        {
+                            bundleNames.Add(key.ToString());
+                            Log = $"key:{key}";
+                        }
+                    }
+
+                    
+                }
             };
         }
         GUILayout.BeginHorizontal();
@@ -116,17 +134,16 @@ public class AddressablesSceneHandler : MonoBehaviour
         locPos = GUILayout.BeginScrollView(locPos, GUILayout.Height(300));
         GUILayout.BeginVertical();
         {
-            //var bundles = new List<string>();
-            foreach(var locator in Addressables.ResourceLocators)
+            if (bundleNames != null)
             {
-                GUILayout.Label($"{locator.LocatorId}");
-                foreach (var key in locator.Keys)
+                foreach (var bundleName in bundleNames)
                 {
-                    if (key.ToString().EndsWith("bundle"))
-                    {
-                        GUILayout.Label($"[{key.GetType().Name}] {key}");
-                        //bundles.Add(key.ToString());
-                    }
+                    var outCachedVersions = new List<Hash128>();
+                    Caching.GetCachedVersions(bundleName, outCachedVersions);
+                    GUILayout.Label($"{bundleName}:{outCachedVersions.Count}");
+
+
+                    
                 }
             }
             //if (bundles.Count > 0 && GUILayout.Button("GetDownloadSize"))
