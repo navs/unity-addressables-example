@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
@@ -12,6 +13,7 @@ public class AddressablesSceneHandler : MonoBehaviour
         GUICache();
         GUIAddressableInit();
         GUIBundles();
+        GUIBundleCaches();
     }
 
     private long cacheSize = 0;
@@ -141,6 +143,56 @@ public class AddressablesSceneHandler : MonoBehaviour
                 }
             }
             GUILayout.EndHorizontal();
+        }
+        GUILayout.EndVertical();
+    }
+
+    void GUIBundleCaches()
+    {
+        GUILayout.BeginVertical("box");
+        {
+            GUILayout.BeginHorizontal("box");
+            {
+                if (GUILayout.Button("Save", GUILayout.Height(40)))
+                {
+                    BundleCaches.Instance.Save();
+                }
+                if (GUILayout.Button("Load", GUILayout.Height(40)))
+                {
+                    BundleCaches.Instance.Load();
+                }
+                if (GUILayout.Button("Add current", GUILayout.Height(40)))
+                {
+                    BundleCaches.Instance.Add(BundleManager.Instance.Bundles.Select(b => (b.bundleName, b.bundleHash)));
+                }
+                if (GUILayout.Button("Clear Old Bundle Caches", GUILayout.Height(40)))
+                {
+                    // @TODO implementation
+                }
+            }
+            GUILayout.EndHorizontal();
+
+            bool clearSomething = false;
+            foreach (var bundleCache in BundleCaches.Instance.Bundles)
+            {
+                GUILayout.BeginHorizontal("box");
+                {
+                    if (GUILayout.Button("X", GUILayout.Width(40), GUILayout.Height(40)))
+                    {
+                        clearSomething = true;
+                        Caching.ClearCachedVersion(bundleCache.name, Hash128.Parse(bundleCache.hash));
+                    }
+                    GUILayout.Button($"{bundleCache.name.Substring(0, 6)}");
+                    GUILayout.Button($"{bundleCache.hash.Substring(0, 6)}");
+                    GUILayout.Button($"{BundleManager.Instance.Bundles.Exists(b => b.bundleName == bundleCache.name && b.bundleHash == bundleCache.hash)}");
+                }
+                GUILayout.EndVertical();
+            }
+            if (clearSomething)
+            {
+                cacheSize = Caches.GetAllCachedSize();
+                BundleManager.Instance.RefreshBundles();
+            }
         }
         GUILayout.EndVertical();
     }

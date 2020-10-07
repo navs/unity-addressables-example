@@ -24,6 +24,7 @@ public class BundleCaches
     }
 
     private List<(string name, string hash)> bundles;
+    public List<(string name, string hash)> Bundles => bundles;
     private static readonly string PrefName = "BundleCaches";
 
 
