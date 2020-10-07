@@ -1,298 +1,147 @@
-﻿using JetBrains.Annotations;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEditor;
+﻿using System.Linq;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.Networking;
-using UnityEngine.ResourceManagement.AsyncOperations;
 using UnityEngine.UI;
-using UnityEngine.Video;
 
 public class AddressablesSceneHandler : MonoBehaviour
 {
-    List<string> logs;
-    Vector2 logPos;
-    RawImage mainImage;
-    RenderTexture rt;
+    public Text DownloadingText;
 
-    List<string> bundleNames;
-
-    string Log
-    {
-        set
-        {
-            if (logs == null)
-            {
-                logs = new List<string>();
-            }
-            logs.Insert(0, value + "\n");
-            Debug.Log(value);
-
-            if (logs.Count > 20)
-            {
-                logs.RemoveRange(0, logs.Count - 20);
-            }
-        }
-    }
-    // Start is called before the first frame update
-
-    long cacheSize;
-    Vector2 locPos;
-    
-    void Start()
-    {
-        mainImage = FindObjectOfType<RawImage>();
-        Log = "Started";
-        RefershCacheSize(false);
-    }
     private void OnGUI()
     {
-        if (GUILayout.Button("Initialize"))
+        GUICache();
+        GUIAddressableInit();
+        GUIBundles();
+    }
+
+    private long cacheSize = 0;
+    void GUICache()
+    {
+        GUILayout.BeginHorizontal("box");
         {
-            Addressables.InitializeAsync().Completed += (handler) =>
+            if (GUILayout.Button("Clear", GUILayout.Height(40)))
             {
-                Log = $"Initialized ... Result : {handler.Status}";
-
-                bundleNames = new List<string>();
-                foreach (var locator in Addressables.ResourceLocators)
+                if (!Caches.Clear())
                 {
-                    Log = $"Locator: {locator.LocatorId}";
-                    foreach (var key in locator.Keys)
-                    {
-                        if (key.ToString().EndsWith("bundle"))
-                        {
-                            bundleNames.Add(key.ToString());
-                            Log = $"key:{key}";
-                        }
-                    }
-
-                    
+                    Debug.Log("Failed to clear cache.");
                 }
-            };
-        }
-        GUILayout.BeginHorizontal();
-        {
-            if (GUILayout.Button("Load Prefab"))
-            {
-                Addressables.LoadAssetAsync<GameObject>("Assets/Art/Characters/Prefabs/Base/High Quality/MaleFree1.prefab").Completed += (h) =>
-                {
-                    if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-                    {
-                        GameObject instance = Instantiate<GameObject>(h.Result);
-                        instance.transform.position = Vector3.zero;
-                        RotateAndDispear rotator = instance.AddComponent<RotateAndDispear>();
-                        rotator.InitParameters();
-
-#if UNITY_EDITOR
-                    foreach (var smr in rotator.GetComponentsInChildren<SkinnedMeshRenderer>())
-                        {
-                            for (int i = 0; i < smr.sharedMaterials.Length; i++)
-                            {
-                                smr.sharedMaterials[i].shader = Shader.Find(smr.sharedMaterials[i].shader.name);
-                            }
-                        }
-#endif
-                }
-                    else
-                    {
-                        Log = "Something's wrong...";
-                    }
-                };
             }
-            if (GUILayout.Button("Load Texture"))
+            if (GUILayout.Button("Refresh Size", GUILayout.Height(40)))
             {
-                Addressables.LoadAssetAsync<Texture>("Assets/Art/Textures/moamoadragon.jpg").Completed += (h) =>
-                {
-                    if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-                    {
-                        mainImage.texture = h.Result;
-                    }
-                    else
-                    {
-                        Log = "Something's wrong...";
-                    }
-                };
+                cacheSize = Caches.GetAllCachedSize();
+            }
+            GUILayout.Label($"SIZE: {cacheSize}");
+        }
+        GUILayout.EndHorizontal();
+    }
+
+    void GUIAddressableInit()
+    {
+        GUILayout.BeginHorizontal("box");
+        {
+            if (GUILayout.Button("Init Addressables", GUILayout.Height(40)))
+            {
+                BundleManager.Instance.Init();
+            }
+            if (GUILayout.Button("Refresh", GUILayout.Height(40)))
+            {
+                BundleManager.Instance.RefreshBundles();
             }
         }
         GUILayout.EndHorizontal();
+    }
 
-        GUILayout.BeginHorizontal();
+    void GUIBundles()
+    {
+        var bundles = BundleManager.Instance.Bundles;
+        if (bundles == null || bundles.Count == 0)
         {
-            GUILayout.Label($"CacheSize:{SizeString(cacheSize)}");
-            if (GUILayout.Button("Refresh"))
-            {
-                RefershCacheSize(false);
-            }
-            if (GUILayout.Button("Clean Cache"))
-            {
-                RefershCacheSize(true);
-            }
-        }
-        GUILayout.EndHorizontal();
-
-        locPos = GUILayout.BeginScrollView(locPos, GUILayout.Height(300));
-        GUILayout.BeginVertical();
-        {
-            if (bundleNames != null)
-            {
-                foreach (var bundleName in bundleNames)
-                {
-                    var outCachedVersions = new List<Hash128>();
-                    Caching.GetCachedVersions(bundleName, outCachedVersions);
-                    GUILayout.Label($"{bundleName}:{outCachedVersions.Count}");
-
-
-                    
-                }
-            }
-            //if (bundles.Count > 0 && GUILayout.Button("GetDownloadSize"))
-            //{
-            //    Addressables.GetDownloadSizeAsync(bundles).Completed += (h) =>
-            //    {
-            //        if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-            //        {
-            //            long downloadSize = h.Result;
-            //            Log = $"Download Size: {SizeString(downloadSize)}({downloadSize})";
-            //        }
-            //    };
-            //}
-        }
-        GUILayout.EndVertical();
-        GUILayout.EndScrollView();
-
-        //if (GUILayout.Button("Check Update Catalog"))
-        //{
-        //    Addressables.CheckForCatalogUpdates(false).Completed += (h) =>
-        //    {
-        //        if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-        //        {
-        //            Log = $"Num Catalogs for update: {h.Result.Count}";
-        //            foreach (string cat in h.Result)
-        //            {
-        //                Log = $"UpdateCatalog:{cat}";
-        //            }
-        //        }
-        //    };
-        //}
-        if (GUILayout.Button("Get Download Size"))
-        {
-            var keys = new List<string>() { "Characters", "Textures" };
-            Addressables.GetDownloadSizeAsync(keys).Completed += (h) =>
-            {
-                if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-                {
-                    long downloadSize = h.Result;
-                    Log = $"Download Size: {SizeString(downloadSize)}({downloadSize})";
-                }
-            };
+            return;
         }
 
-        if (GUILayout.Button("UpdateCatalog"))
+        GUILayout.BeginVertical("box");
+
+        if (BundleManager.Instance.HasUpdate() && GUILayout.Button("Download ALL"))
         {
-            Addressables.UpdateCatalogs(null, false).Completed += (h) =>
+            var handle = Addressables.DownloadDependenciesAsync(BundleManager.Instance.GetUpdateKeysAll(), Addressables.MergeMode.Union);
+            if (DownloadingText)
             {
-                if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
+                AsyncOperationMonitor.Create(handle, (finish, percent) =>
                 {
-                    foreach (var locator in h.Result)
+                    if (finish)
                     {
-                        Log = $"UpdateCatalog:{locator.LocatorId}";
+                        DownloadingText.text = $"Downloaded";
+                        BundleManager.Instance.RefreshBundles();
+                        cacheSize = Caches.GetAllCachedSize();
                     }
-                }
-
-            };
-        }
-
-        if (GUILayout.Button("Movie"))
-        {
-            LoadMovie();
-        }
-
-        GUILayout.FlexibleSpace();
-
-        logPos = GUILayout.BeginScrollView(logPos, "box", GUILayout.Height(200));
-        GUILayout.BeginVertical();
-        {
-            foreach (var log in logs)
-            {
-                GUILayout.Label(log);
-            }
-        }
-        GUILayout.EndVertical();
-        GUILayout.EndScrollView();
-    }
-
-    private void RefershCacheSize(bool cleanCache)
-    {
-        var cachePaths = new List<string>();
-        Caching.GetAllCachePaths(cachePaths);
-
-        cacheSize = 0;
-        foreach (var cachePath in cachePaths)
-        {
-            var cache = Caching.GetCacheByPath(cachePath);
-            cacheSize += cache.spaceOccupied;
-
-            Log = $"cache[{cachePath}] = {cache.spaceOccupied}";
-            if (cleanCache)
-            {
-                cache.ClearCache();
-            }
-        }
-    }
-
-    private static string SizeString(long size)
-    {
-        if (size > 1024 * 1024 * 1024L)
-        {
-            return $"{size / 1024 / 1024 / 1024}.{((size / 1024 / 1024) % 1024) * 100 / 1024:000}GiB";
-        }
-        else if (size > 1024 * 1204L)
-        {
-            return $"{size / 1024 / 1024}.{((size / 1024) % 1024) * 100 / 1024:000}MiB";
-        } 
-        else if (size > 1024)
-        {
-            return $"{size / 1024}.{(size % 1024) * 100 / 1024:000}KiB";
-        }
-        return $"{size}B";
-    }
-
-    private void LoadMovie()
-    {
-        Addressables.LoadAssetAsync<VideoClip>("Assets/Art/Movies/anne_35_38.avi").Completed += (h) =>
-        {
-            if (h.IsDone && h.Status == AsyncOperationStatus.Succeeded)
-            {
-                var playerObject = new GameObject("VidioPlayer");
-                var player = playerObject.AddComponent<VideoPlayer>();
-                var audioSource = playerObject.AddComponent<AudioSource>();
-                player.clip = h.Result;
-                //player.renderMode = VideoRenderMode.MaterialOverride;
-                //player.targetMaterialProperty = "_Texture";
-                //player.targetMaterialRenderer = mainImage.GetComponent<Renderer>();
-
-                player.renderMode = VideoRenderMode.RenderTexture;
-                if (rt == null)
-                {
-                    rt = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32);
-                    rt.Create();
-                }
-                if (mainImage)
-                {
-                    mainImage.texture = rt;
-                }
-                player.targetTexture = rt;
-
-
-                player.audioOutputMode = VideoAudioOutputMode.AudioSource;
-                player.SetTargetAudioSource(0, audioSource);
-                player.playOnAwake = true;
+                    else
+                    {
+                        DownloadingText.text = $"Downloading {percent:F2} %";
+                    }
+                });
             }
             else
             {
-                Log = $"Error to load a VideoClip";
+                handle.Completed += (h) =>
+                {
+                    BundleManager.Instance.RefreshBundles();
+                    cacheSize = Caches.GetAllCachedSize();
+                };
             }
-        };
+        }
+
+        foreach (var bundle in bundles)
+        {
+            GUILayout.BeginHorizontal("box");
+            {
+                if (GUILayout.Button(bundle.name) && bundle.size > 0)
+                {
+                    Debug.Log($"Start Loading {bundle.key}");
+                    var handle = Addressables.DownloadDependenciesAsync(bundle.key);
+                    if (DownloadingText)
+                    {
+                        DownloadingText.text = "Start";
+                        AsyncOperationMonitor.Create(handle, (finish, percent) =>
+                        {
+                            if (finish)
+                            {
+                                DownloadingText.text = $"{bundle.name} Downloaded";
+                                BundleManager.Instance.RefreshBundles();
+                                cacheSize = Caches.GetAllCachedSize();
+
+                                // Release _aa resource
+                                Addressables.Release(handle.Result);
+                            }
+                            else
+                            {
+                                DownloadingText.text = $"{bundle.name} Downloading {percent:F2} %";
+                            }
+                        });
+                    }
+                    else
+                    {
+                        handle.Completed += (h) =>
+                        {
+                            BundleManager.Instance.RefreshBundles();
+                            cacheSize = Caches.GetAllCachedSize();
+                        };
+                    }
+                }
+
+                GUILayout.Label($"[ {bundle.size} ]");
+
+                if (!string.IsNullOrEmpty(bundle.bundleName))
+                {
+                    GUILayout.Button($"{bundle.bundleName.Substring(0, 6)}");
+                    GUILayout.Button($"{bundle.bundleHash.Substring(0, 6)}");
+                }
+                else
+                {
+                    GUILayout.Label("no bundle name & hash");
+                }
+            }
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.EndVertical();
     }
 }
